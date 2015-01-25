@@ -1,0 +1,51 @@
+Practical Machine Learning - Course Project
+===========================================
+
+To build the model I plotted some predictors to find some correlation with the way the exercise was done. For example, the roll_forearm variable:
+
+```{r qplot, fig.width=4, fig.height=3, message=FALSE}
+library('caret')
+har <- read.csv('pml-training.csv')
+qplot(x = har$roll_forearm, color = har$classe, geom = 'density')
+```
+
+After that, I noticed that the roll, pitch and yaw data from the sensors were reasonable predictors to train the model with. So I chose them as predictors.
+
+In order to train the model I split the training data into a training set containing 75% of the samples and a testing set containing the other 25%. The method used was GBM with 150 trees of depth 12 for each iteration. I used a 5-fold cross-validation repeated 3 times.
+
+```{r message=FALSE}
+set.seed(875)
+
+inTrain <- createDataPartition(y = har$classe, p = 3/4, list = FALSE)
+training <- har[inTrain,]
+testing  <- har[-inTrain,]
+
+modelPredictorNames <- c('classe', 'roll_belt', 'roll_forearm', 'roll_arm', 'roll_dumbbell',
+                         'pitch_belt', 'pitch_forearm', 'pitch_arm', 'pitch_dumbbell',
+                         'yaw_belt', 'yaw_forearm', 'yaw_arm', 'yaw_dumbbell',
+                         'total_accel_belt', 'total_accel_forearm', 'total_accel_arm', 'total_accel_dumbbell')
+
+trainData <- data.frame(training[modelPredictorNames])
+testData <- data.frame(testing[modelPredictorNames])
+
+modelFit <- train(classe ~., 
+                  data = trainData, 
+                  method = 'gbm',
+                  preProcess = c('scale', 'center'),
+                  trControl = trainControl(method = 'repeatedcv', number = 5, repeats = 3),
+                  tuneGrid = data.frame(interaction.depth = 12, n.trees = 150, shrinkage = .1),
+                  verbose = FALSE)
+```
+
+The built model has a good accuracy, I expect the out of sample error to be around 2% based on resampling accuracy. The model information is shown below:
+
+```{r}
+modelFit
+```
+
+Using the model to predict on the testing data set:
+
+```{r}
+pred <- predict(modelFit, testData)
+confusionMatrix(testData$classe, pred)
+```
